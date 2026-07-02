@@ -1,0 +1,20 @@
+# Team build: unsigned universal macOS DMG (no Apple Developer account).
+# Overrides the signing/notarization/publish parts of the base config;
+# everything else (files, appId, entitlements paths, output dir) is inherited.
+extends: ./electron-builder.yaml
+
+mac:
+  notarize: false
+  identity: null
+  provisioningProfile: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
+  target:
+    - target: dmg
+      arch:
+        - universal
+  publish: never
+
+dmg:
+  sign: false
+  publish: never

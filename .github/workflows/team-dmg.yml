@@ -1,0 +1,69 @@
+# Builds the team's unsigned universal macOS DMG (see electron-builder.team.yaml).
+# Runs on demand or on a v*-evaro* tag, which also creates a release with the DMG.
+# Trimmed from test-mac-dmg-build.yml: no signing keychain, no notarization,
+# no provisioning profile; the app is ad-hoc signed so arm64 Macs will run it.
+name: Team macOS DMG
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*-evaro*']
+
+permissions:
+  contents: write
+
+jobs:
+  build-dmg:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v6
+        with:
+          persist-credentials: false
+
+      - name: Setup Electron build environment
+        uses: ./.github/actions/setup-electron-build
+
+      # Same retry trick as test-mac-dmg-build.yml: @nx/nx-darwin-arm64 and
+      # dmg-license are skipped by npm's optional-dep bug, and electron's
+      # postinstall binary download is flaky.
+      - name: Install npm packages
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 15
+          shell: bash
+          command: npm install @nx/nx-darwin-arm64 dmg-license && npm i || { rm -rf node_modules/electron; exit 1; }
+
+      - name: Generate environment & build sources
+        run: |
+          npm run env
+          npm run build
+
+      - name: Package app (unsigned)
+        run: npx electron-builder --mac dir --universal --config electron-builder.team.yaml --publish=never
+
+      # arm64 Macs refuse to exec unsigned binaries, so give the packaged app
+      # an ad-hoc signature before wrapping it in the DMG.
+      - name: Ad-hoc sign
+        run: codesign --force --deep --sign - ".tmp/app-builds/mac-universal/Super Productivity.app"
+
+      - name: Build DMG from prepackaged app
+        run: npx electron-builder --mac dmg --universal --config electron-builder.team.yaml --prepackaged ".tmp/app-builds/mac-universal/Super Productivity.app" --publish=never
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mac-dmg
+          path: .tmp/app-builds/*.dmg
+          if-no-files-found: error
+
+      - name: Release (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" .tmp/app-builds/*.dmg \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Team build: upstream ceefb5000c plus the nodeExecution spawn fix (super-productivity#8708). Unsigned build. After dragging to Applications run: xattr -dr com.apple.quarantine \"/Applications/Super Productivity.app\""
