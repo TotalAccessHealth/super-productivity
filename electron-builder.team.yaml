@@ -13,8 +13,8 @@ mac:
     - target: dmg
       arch:
         - universal
-  publish: never
+  publish: null
 
 dmg:
   sign: false
-  publish: never
+  publish: null
