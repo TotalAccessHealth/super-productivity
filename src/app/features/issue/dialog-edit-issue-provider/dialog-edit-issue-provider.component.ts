@@ -631,6 +631,7 @@ export class DialogEditIssueProviderComponent {
     pattern?: string;
     options?: { value: string; label: string }[];
     showIf?: string;
+    defaultValue?: string | boolean | string[];
   }): unknown {
     if (f.type === 'link') {
       return {
@@ -649,6 +650,7 @@ export class DialogEditIssueProviderComponent {
     return {
       key: ('pluginConfig.' + f.key) as keyof IssueIntegrationCfg,
       type: formlyType,
+      ...(f.defaultValue !== undefined ? { defaultValue: f.defaultValue } : {}),
       ...(f.showIf
         ? {
             hideExpression: (m: Record<string, unknown>) =>

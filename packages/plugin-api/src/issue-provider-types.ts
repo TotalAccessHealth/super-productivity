@@ -113,6 +113,8 @@ export interface PluginFormField {
   url?: string;
   /** Regex pattern for input validation */
   pattern?: string;
+  /** Initial value shown when the stored config has none yet */
+  defaultValue?: string | boolean | string[];
   /** Place this field in the collapsible "Advanced Config" section */
   advanced?: boolean;
   /** Only show this field when the specified config key is truthy */
